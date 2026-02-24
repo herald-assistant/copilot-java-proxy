@@ -19,22 +19,21 @@ import java.util.List;
 public class ChatCompletionsController {
 
     private final String defaultModel;
+    private final Duration timeout;
     private final CopilotWorkerLauncher launcher;
 
     public ChatCompletionsController(
-            ObjectMapper om,
+            CopilotWorkerLauncher launcher,
             @Value("${herald.copilot.defaultModel:claude-sonnet-4.5}") String defaultModel,
             @Value("${herald.copilot.workerTimeoutMs:120000}") long workerTimeoutMs
     ) {
+        this.launcher = launcher;
         this.defaultModel = defaultModel;
-        this.launcher = new CopilotWorkerLauncher(om, Duration.ofMillis(workerTimeoutMs));
+        this.timeout = Duration.ofMillis(workerTimeoutMs);
     }
 
     @PostMapping("/chat/completions")
-    public OpenAIChatResponse chatCompletions(
-            HttpServletRequest httpReq,
-            @Valid @RequestBody OpenAIChatRequest req
-    ) {
+    public OpenAIChatResponse chatCompletions(HttpServletRequest httpReq, @Valid @RequestBody OpenAIChatRequest req) {
         String token = GithubTokenExtractor.extract(httpReq);
         try {
             GithubTokenExtractor.validateOrThrow(token);
@@ -43,14 +42,10 @@ public class ChatCompletionsController {
         }
 
         String model = (req.model == null || req.model.isBlank()) ? defaultModel : req.model;
-
-        // Minimalny “OpenAI-like” prompt builder:
-        // - sklejamy system+user w jeden prompt (na start), a assistant ignorujemy
         String prompt = buildPrompt(req.messages);
 
         try {
-            String answer = launcher.runOnce(token, model, prompt);
-
+            String answer = launcher.runOnce(token, model, prompt, timeout);
             OpenAIChatResponse resp = new OpenAIChatResponse();
             resp.model = model;
 
@@ -60,7 +55,6 @@ public class ChatCompletionsController {
 
             resp.choices = List.of(c);
             return resp;
-
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Copilot execution failed: " + safeMsg(e), e);
         }
@@ -69,7 +63,6 @@ public class ChatCompletionsController {
     private static String buildPrompt(List<OpenAIChatRequest.Message> messages) {
         StringBuilder sb = new StringBuilder();
         for (OpenAIChatRequest.Message m : messages) {
-            // prosto i przewidywalnie
             sb.append("[").append(m.role).append("]\n");
             sb.append(m.content).append("\n\n");
         }
