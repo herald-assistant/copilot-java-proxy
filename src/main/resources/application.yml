@@ -1,9 +1,2 @@
 server:
   port: 8788
-
-herald:
-  copilot:
-    # domyślny model (możesz nadpisać w request)
-    defaultModel: "claude-sonnet-4.5"
-    # timeout na jedną odpowiedź (ms)
-    workerTimeoutMs: 120000

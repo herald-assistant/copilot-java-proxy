@@ -4,51 +4,40 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.2</version>
+        <relativePath/>
+    </parent>
+
     <groupId>com.acme.herald</groupId>
-    <artifactId>herald-copilot-proxy</artifactId>
+    <artifactId>herald-copilot-connector</artifactId>
     <version>0.1.0</version>
-    <name>herald-copilot-proxy</name>
+    <name>herald-copilot-connector</name>
+    <packaging>jar</packaging>
 
     <properties>
         <java.version>21</java.version>
-        <spring-boot.version>3.4.2</spring-boot.version>
         <copilot.sdk.version>1.0.9</copilot.sdk.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
-    <packaging>war</packaging>
-
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-dependencies</artifactId>
-                <version>${spring-boot.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <dependencies>
-        <!-- Web API -->
+        <!-- UI -->
+        <dependency>
+            <groupId>com.formdev</groupId>
+            <artifactId>flatlaf</artifactId>
+            <version>3.5.4</version>
+        </dependency>
+
+        <!-- Web API (embedded Tomcat) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-tomcat</artifactId>
-                </exclusion>
-            </exclusions>
         </dependency>
 
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-tomcat</artifactId>
-            <scope>provided</scope>
-        </dependency>
-
-        <!-- Validation (opcjonalnie, ale przydatne) -->
+        <!-- Validation -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
@@ -61,7 +50,7 @@
             <version>${copilot.sdk.version}</version>
         </dependency>
 
-        <!-- JSON -->
+        <!-- JSON (opcjonalne, Boot i tak je wciąga przez web, ale nie szkodzi) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -80,20 +69,8 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>repackage</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <release>${java.version}</release>
+                    <mainClass>com.acme.herald.copilot.HeraldCopilotProxyApplication</mainClass>
                 </configuration>
             </plugin>
         </plugins>
