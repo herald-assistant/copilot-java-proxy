@@ -1,6 +1,8 @@
 package com.acme.herald.copilot.ui;
 
 import com.acme.herald.copilot.core.ConnectorState;
+import com.acme.herald.copilot.core.security.DpapiCrypto;
+import com.acme.herald.copilot.core.security.LocalTokenStore;
 import com.formdev.flatlaf.FlatLightLaf;
 
 import javax.imageio.ImageIO;
@@ -10,7 +12,10 @@ import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.geom.RoundRectangle2D;
+import java.io.IOException;
 import java.io.InputStream;
+import java.util.Optional;
+
 
 public class HeraldConnectorFrame extends JFrame {
 
@@ -38,6 +43,11 @@ public class HeraldConnectorFrame extends JFrame {
     private JButton startBtn, stopBtn, clearLogsBtn;
     private JPasswordField tokenField;
     private JCheckBox showToken;
+
+    private JCheckBox persistToken;
+    private JButton deleteSavedTokenBtn;
+    private final LocalTokenStore tokenStore = new LocalTokenStore();
+
     private StatusPill statusPill;
 
     public HeraldConnectorFrame(ConnectorState state, int port, Runnable onClose) {
@@ -48,6 +58,8 @@ public class HeraldConnectorFrame extends JFrame {
 
         setupLookAndFeelOnce();
         buildUi();
+
+        tryAutoLoadSavedToken();
         refreshFromState();
 
         append("Wklej GitHub Copilot token (PAT) i kliknij Start.");
@@ -105,7 +117,7 @@ public class HeraldConnectorFrame extends JFrame {
         title.setForeground(TEXT_2);
         title.setFont(title.getFont().deriveFont(Font.BOLD, 26f));
 
-        var subtitle = new JLabel("Spring Boot most do GitHub Copilot SDK — token tylko w pamięci, REST OpenAI-like");
+        var subtitle = new JLabel("Spring Boot most do GitHub Copilot SDK");
         subtitle.setForeground(MUTED);
         subtitle.setFont(subtitle.getFont().deriveFont(Font.PLAIN, 13f));
 
@@ -148,12 +160,21 @@ public class HeraldConnectorFrame extends JFrame {
 
         tokenField = new JPasswordField();
         tokenField.setEchoChar('•');
-        tokenField.setToolTipText("Wklej token GitHub (PAT). Token nie jest zapisywany na dysku.");
+        tokenField.setToolTipText("Wklej token GitHub (PAT). Domyślnie token nie jest zapisywany na dysku (opcjonalnie).");
 
         showToken = new JCheckBox("Pokaż token");
         showToken.setOpaque(false);
         showToken.setForeground(TEXT);
         showToken.addActionListener(e -> tokenField.setEchoChar(showToken.isSelected() ? (char) 0 : '•'));
+
+        persistToken = new JCheckBox("Zapamiętaj token na tym komputerze");
+        persistToken.setOpaque(false);
+        persistToken.setForeground(TEXT);
+        persistToken.setToolTipText("Token zostanie zapisany lokalnie w profilu użytkownika.");
+
+        deleteSavedTokenBtn = new JButton("Usuń zapisany token");
+        deleteSavedTokenBtn.setToolTipText("Usuwa token zapisany lokalnie.");
+        deleteSavedTokenBtn.addActionListener(e -> deleteSavedToken());
 
         startBtn = new JButton("Start");
         stopBtn = new JButton("Stop");
@@ -169,30 +190,65 @@ public class HeraldConnectorFrame extends JFrame {
         clearLogsBtn.addActionListener(e -> logs.setText(""));
 
         // Row 0: token
-        c.gridx = 0; c.gridy = 0; c.gridwidth = 1; c.weightx = 0;
+        c.gridx = 0;
+        c.gridy = 0;
+        c.gridwidth = 1;
+        c.weightx = 0;
         card.add(label("GitHub token (PAT)"), c);
 
-        c.gridx = 1; c.gridy = 0; c.gridwidth = 2; c.weightx = 1;
+        c.gridx = 1;
+        c.gridy = 0;
+        c.gridwidth = 2;
+        c.weightx = 1;
         card.add(tokenField, c);
 
-        c.gridx = 3; c.gridy = 0; c.gridwidth = 1; c.weightx = 0;
+        c.gridx = 3;
+        c.gridy = 0;
+        c.gridwidth = 1;
+        c.weightx = 0;
         card.add(showToken, c);
 
-        // Row 1: start/stop + clear logs
-        c.gridy = 1; c.gridwidth = 1; c.fill = GridBagConstraints.HORIZONTAL;
+        // Row 1: persistence
+        c.gridy = 1;
+        c.gridwidth = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
 
-        c.gridx = 0; c.weightx = 1;
+        c.gridx = 0;
+        c.weightx = 0;
+        card.add(new JLabel(""), c); // spacer under label
+
+        c.gridx = 1;
+        c.gridwidth = 2;
+        c.weightx = 1;
+        card.add(persistToken, c);
+
+        c.gridx = 3;
+        c.gridwidth = 1;
+        c.weightx = 0;
+        card.add(deleteSavedTokenBtn, c);
+
+        // Row 2: start/stop + clear logs
+        c.gridy = 2;
+        c.gridwidth = 1;
+        c.fill = GridBagConstraints.HORIZONTAL;
+
+        c.gridx = 0;
+        c.weightx = 1;
         card.add(startBtn, c);
 
-        c.gridx = 1; c.weightx = 1;
+        c.gridx = 1;
+        c.weightx = 1;
         card.add(stopBtn, c);
 
-        c.gridx = 2; c.weightx = 1;
+        c.gridx = 2;
+        c.weightx = 1;
         card.add(clearLogsBtn, c);
 
-        c.gridx = 3; c.weightx = 1;
+        c.gridx = 3;
+        c.weightx = 1;
         card.add(Box.createHorizontalStrut(1), c);
 
+        updatePersistControls();
         return card;
     }
 
@@ -223,18 +279,60 @@ public class HeraldConnectorFrame extends JFrame {
         return l;
     }
 
-    private String endpoint() {
-        return "http://localhost:" + port + "/chat/completions";
+    private void tryAutoLoadSavedToken() {
+        if (!DpapiCrypto.isWindows()) {
+            if (persistToken != null) {
+                persistToken.setSelected(false);
+                persistToken.setEnabled(false);
+                persistToken.setToolTipText("Zapamiętywanie tokena jest dostępne tylko na Windows.");
+            }
+            if (deleteSavedTokenBtn != null) {
+                deleteSavedTokenBtn.setEnabled(false);
+            }
+            append("Info: Zapamiętywanie tokena działa tylko na Windows.");
+            return;
+        }
+
+        if (!tokenStore.exists()) {
+            updatePersistControls();
+            return;
+        }
+
+        try {
+            Optional<String> opt = tokenStore.loadPlainToken();
+            if (opt.isPresent()) {
+                tokenField.setText(opt.get());
+                persistToken.setSelected(true);
+                append("Wczytano token zapisany lokalnie.");
+            }
+        } catch (Exception e) {
+            append("Uwaga: nie udało się wczytać tokena z dysku.");
+        }
+
+        updatePersistControls();
     }
 
     private void start() {
+        System.out.println("START");
         if (state.isEnabled()) return;
 
         String token = new String(tokenField.getPassword()).trim();
         try {
             validateTokenOrThrow(token);
-            state.enableWithToken(token);
 
+            if (persistToken != null && persistToken.isSelected()) {
+                if (!DpapiCrypto.isWindows()) {
+                    throw new IllegalArgumentException("Zapamiętywanie tokena działa tylko na Windows.");
+                }
+                try {
+                    tokenStore.savePlainToken(token);
+                    append("Token zapisany lokalnie.");
+                } catch (IOException ioe) {
+                    throw new IllegalArgumentException("Nie udało się zapisać tokena lokalnie: " + ioe.getMessage());
+                }
+            }
+
+            state.enableWithToken(token);
             statusPill.setStateOn("ON");
             append("Start.");
         } catch (IllegalArgumentException ex) {
@@ -251,6 +349,47 @@ public class HeraldConnectorFrame extends JFrame {
         refreshFromState();
     }
 
+    private void deleteSavedToken() {
+        if (state.isEnabled()) {
+            JOptionPane.showMessageDialog(this,
+                    "Zatrzymaj connector (Stop), aby usunąć zapisany token.",
+                    "Connector aktywny",
+                    JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        if (!DpapiCrypto.isWindows()) return;
+
+        if (!tokenStore.exists()) {
+            append("Brak zapisanego tokena do usunięcia.");
+            updatePersistControls();
+            return;
+        }
+
+        int res = JOptionPane.showConfirmDialog(
+                this,
+                "Usunąć token zapisany lokalnie na tym komputerze?",
+                "Potwierdź usunięcie",
+                JOptionPane.YES_NO_OPTION
+        );
+        if (res != JOptionPane.YES_OPTION) return;
+
+        try {
+            tokenStore.delete();
+            tokenField.setText("");
+            if (persistToken != null) persistToken.setSelected(false);
+            append("Usunięto zapisany token.");
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "Nie udało się usunąć tokena: " + ex.getMessage(),
+                    "Błąd",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        }
+
+        updatePersistControls();
+    }
+
     private void refreshFromState() {
         boolean on = state.isEnabled();
 
@@ -260,8 +399,35 @@ public class HeraldConnectorFrame extends JFrame {
         tokenField.setEnabled(!on);
         showToken.setEnabled(!on);
 
+        if (persistToken != null) {
+            persistToken.setEnabled(!on && DpapiCrypto.isWindows());
+        }
+        if (deleteSavedTokenBtn != null) {
+            deleteSavedTokenBtn.setEnabled(!on && DpapiCrypto.isWindows() && tokenStore.exists());
+        }
+
         if (on) statusPill.setStateOn("ON");
         else statusPill.setStateOff();
+
+        updatePersistControls();
+    }
+
+    private void updatePersistControls() {
+        boolean canPersist = DpapiCrypto.isWindows();
+        boolean on = state.isEnabled();
+        boolean hasSaved = tokenStore.exists();
+
+        if (persistToken != null) {
+            persistToken.setEnabled(!on && canPersist);
+            if (!canPersist) {
+                persistToken.setSelected(false);
+                persistToken.setToolTipText("Zapamiętywanie tokena jest dostępne tylko na Windows.");
+            }
+        }
+
+        if (deleteSavedTokenBtn != null) {
+            deleteSavedTokenBtn.setEnabled(!on && canPersist && hasSaved);
+        }
     }
 
     private void safeClose() {
@@ -295,7 +461,9 @@ public class HeraldConnectorFrame extends JFrame {
     }
 
     static class CardPanel extends JPanel {
-        CardPanel() { setOpaque(false); }
+        CardPanel() {
+            setOpaque(false);
+        }
 
         @Override
         protected void paintComponent(Graphics g) {
