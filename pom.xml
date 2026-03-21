@@ -19,7 +19,7 @@
 
     <properties>
         <java.version>21</java.version>
-        <copilot.sdk.version>1.0.9</copilot.sdk.version>
+        <copilot.sdk.version>0.1.32-java.0</copilot.sdk.version>
         <jna.version>5.14.0</jna.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
@@ -44,24 +44,10 @@
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
 
-        <!-- Copilot Community SDK (Java) -->
         <dependency>
-            <groupId>io.github.copilot-community-sdk</groupId>
-            <artifactId>copilot-sdk</artifactId>
+            <groupId>com.github</groupId>
+            <artifactId>copilot-sdk-java</artifactId>
             <version>${copilot.sdk.version}</version>
-        </dependency>
-
-        <!-- JSON (opcjonalne, Boot i tak je wciąga przez web, ale nie szkodzi) -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-
-        <!-- Testy -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
         </dependency>
 
         <dependency>
