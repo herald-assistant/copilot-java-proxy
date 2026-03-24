@@ -39,6 +39,7 @@ public class HeraldConnectorFrame extends JFrame {
     private static final Color SHADOW = new Color(15, 23, 42, 10);
     private static final Color TINT = new Color(0, 113, 227, 10);
     private static final Color TINT_BORDER = new Color(0, 113, 227, 28);
+    private static final int TOP_CARDS_HEIGHT = 350;
 
     private static final DateTimeFormatter LOG_TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
 
@@ -134,10 +135,11 @@ public class HeraldConnectorFrame extends JFrame {
 
     private JComponent buildMainSplitPane() {
         JPanel dashboard = buildTopRow();
-        dashboard.setMinimumSize(new Dimension(320, 320));
+        dashboard.setMinimumSize(new Dimension(320, TOP_CARDS_HEIGHT));
+        dashboard.setPreferredSize(new Dimension(320, TOP_CARDS_HEIGHT));
 
         JPanel logsCard = buildLogsCard();
-        logsCard.setMinimumSize(new Dimension(320, 220));
+        logsCard.setMinimumSize(new Dimension(320, 200));
         logsCard.setPreferredSize(new Dimension(320, 280));
 
         JComponent topSection = wrapSplitSection(dashboard);
@@ -146,7 +148,7 @@ public class HeraldConnectorFrame extends JFrame {
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, topSection, bottomSection);
         split.setBorder(BorderFactory.createEmptyBorder());
         split.setDividerSize(12);
-        split.setResizeWeight(0.62);
+        split.setResizeWeight(0.56);
         split.setContinuousLayout(true);
         split.setOneTouchExpandable(false);
         split.setOpaque(true);
@@ -157,7 +159,7 @@ public class HeraldConnectorFrame extends JFrame {
             split.repaint();
         });
 
-        SwingUtilities.invokeLater(() -> split.setDividerLocation(420));
+        SwingUtilities.invokeLater(() -> split.setDividerLocation(TOP_CARDS_HEIGHT));
         return split;
     }
 
@@ -330,7 +332,7 @@ public class HeraldConnectorFrame extends JFrame {
         content.add(actionRow);
         content.add(Box.createVerticalGlue());
 
-        card.add(content, BorderLayout.CENTER);
+        card.add(cardScroller(content), BorderLayout.CENTER);
 
         updatePersistControls();
         return card;
@@ -389,7 +391,7 @@ public class HeraldConnectorFrame extends JFrame {
         content.add(Box.createVerticalGlue());
 
         card.add(top, BorderLayout.NORTH);
-        card.add(content, BorderLayout.CENTER);
+        card.add(cardScroller(content), BorderLayout.CENTER);
         return card;
     }
 
@@ -756,6 +758,19 @@ public class HeraldConnectorFrame extends JFrame {
         Dimension preferred = component.getPreferredSize();
         component.setMaximumSize(new Dimension(Integer.MAX_VALUE, preferred.height));
         return component;
+    }
+
+    private JComponent cardScroller(JComponent content) {
+        JScrollPane scroll = new JScrollPane(
+                content,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
+        );
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        return scroll;
     }
 
     private JComponent wrapSplitSection(JComponent content) {
