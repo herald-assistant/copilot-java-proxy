@@ -41,7 +41,9 @@ public class HeraldConnectorFrame extends JFrame {
     private static final Color SHADOW = new Color(15, 23, 42, 10);
     private static final Color TINT = new Color(0, 113, 227, 10);
     private static final Color TINT_BORDER = new Color(0, 113, 227, 28);
-    private static final int TOP_CARDS_HEIGHT = 350;
+    private static final int HEADER_CARD_HEIGHT = 140;
+    private static final int TOP_ROW_HEIGHT = 420;
+    private static final int LOGS_CARD_HEIGHT = 320;
 
     private static final DateTimeFormatter LOG_TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
 
@@ -64,7 +66,6 @@ public class HeraldConnectorFrame extends JFrame {
 
     private StatusPill statusPill;
     private JLabel stateHeadline;
-    private JLabel stateSubline;
     private JLabel connectionValue;
     private JLabel tokenStateValue;
 
@@ -124,44 +125,43 @@ public class HeraldConnectorFrame extends JFrame {
             }
         });
 
-        JPanel root = new JPanel(new BorderLayout(18, 18));
-        root.setBorder(new EmptyBorder(24, 24, 24, 24));
-        root.setBackground(BG);
-
-        root.add(buildHeaderCard(loadImage("/assets/herald-mascot.png")), BorderLayout.NORTH);
-        root.add(buildMainSplitPane(), BorderLayout.CENTER);
-
-        setContentPane(root);
+        setContentPane(buildScrollablePage(loadImage("/assets/herald-mascot.png")));
     }
 
-    private JComponent buildMainSplitPane() {
-        JPanel dashboard = buildTopRow();
-        dashboard.setMinimumSize(new Dimension(320, TOP_CARDS_HEIGHT));
-        dashboard.setPreferredSize(new Dimension(320, TOP_CARDS_HEIGHT));
+    private JComponent buildScrollablePage(Image mascot) {
+        ScrollableContentPanel page = new ScrollableContentPanel();
+        page.setLayout(new BoxLayout(page, BoxLayout.Y_AXIS));
+        page.setBorder(new EmptyBorder(24, 24, 24, 24));
+        page.setOpaque(true);
+        page.setBackground(BG);
 
-        JPanel logsCard = buildLogsCard();
-        logsCard.setMinimumSize(new Dimension(320, 200));
-        logsCard.setPreferredSize(new Dimension(320, 280));
+        JComponent headerCard = lockToFixedHeight(buildHeaderCard(mascot), HEADER_CARD_HEIGHT);
+        headerCard.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JComponent topSection = wrapSplitSection(dashboard);
-        JComponent bottomSection = wrapSplitSection(logsCard);
+        JComponent topRow = lockToFixedHeight(buildTopRow(), TOP_ROW_HEIGHT);
+        topRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, topSection, bottomSection);
-        split.setBorder(BorderFactory.createEmptyBorder());
-        split.setDividerSize(12);
-        split.setResizeWeight(0.56);
-        split.setContinuousLayout(true);
-        split.setOneTouchExpandable(false);
-        split.setOpaque(true);
-        split.setBackground(BG);
-        split.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY, evt -> {
-            topSection.repaint();
-            bottomSection.repaint();
-            split.repaint();
-        });
+        JComponent logsCard = lockToFixedHeight(buildLogsCard(), LOGS_CARD_HEIGHT);
+        logsCard.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        SwingUtilities.invokeLater(() -> split.setDividerLocation(TOP_CARDS_HEIGHT));
-        return split;
+        page.add(headerCard);
+        page.add(Box.createVerticalStrut(18));
+        page.add(topRow);
+        page.add(Box.createVerticalStrut(18));
+        page.add(logsCard);
+
+        JScrollPane scroll = new JScrollPane(
+                page,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
+        );
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.setOpaque(true);
+        scroll.setBackground(BG);
+        scroll.getViewport().setOpaque(true);
+        scroll.getViewport().setBackground(BG);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+        return scroll;
     }
 
     private JPanel buildHeaderCard(Image mascot) {
@@ -338,7 +338,7 @@ public class HeraldConnectorFrame extends JFrame {
         content.add(actionRow);
         content.add(Box.createVerticalGlue());
 
-        card.add(cardScroller(content), BorderLayout.CENTER);
+        card.add(content, BorderLayout.CENTER);
 
         updatePersistControls();
         return card;
@@ -370,11 +370,6 @@ public class HeraldConnectorFrame extends JFrame {
         stateHeadline.setFont(stateHeadline.getFont().deriveFont(Font.BOLD, 24f));
         stateHeadline.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        stateSubline = new JLabel("Wklej token i kliknij Połącz connector.");
-        stateSubline.setForeground(MUTED);
-        stateSubline.setFont(stateSubline.getFont().deriveFont(Font.PLAIN, 14f));
-        stateSubline.setAlignmentX(Component.LEFT_ALIGNMENT);
-
         connectionValue = statusValueLabel("");
         tokenStateValue = statusValueLabel("");
 
@@ -386,9 +381,7 @@ public class HeraldConnectorFrame extends JFrame {
         summaryRow.add(statusTile("Token", tokenStateValue));
 
         content.add(lockToPreferredHeight(stateHeadline));
-        content.add(Box.createVerticalStrut(8));
-        content.add(lockToPreferredHeight(stateSubline));
-        content.add(Box.createVerticalStrut(18));
+        content.add(Box.createVerticalStrut(16));
         content.add(lockToPreferredHeight(summaryRow));
         content.add(Box.createVerticalStrut(18));
         JComponent guideBanner = buildGuideBanner();
@@ -397,7 +390,7 @@ public class HeraldConnectorFrame extends JFrame {
         content.add(Box.createVerticalGlue());
 
         card.add(top, BorderLayout.NORTH);
-        card.add(cardScroller(content), BorderLayout.CENTER);
+        card.add(content, BorderLayout.CENTER);
         return card;
     }
 
@@ -616,19 +609,16 @@ public class HeraldConnectorFrame extends JFrame {
             statusPill.setStateOn("POŁĄCZONY");
             stateHeadline.setText("Connector działa");
             stateHeadline.setForeground(TEXT_2);
-            stateSubline.setText("Herald jest połączony z GitHub Copilot i gotowy do pracy.");
             connectionValue.setText("Połączony");
         } else if (hasToken) {
             statusPill.setStateReady("GOTOWY");
             stateHeadline.setText("Token jest gotowy");
             stateHeadline.setForeground(TEXT_2);
-            stateSubline.setText("Możesz teraz kliknąć Połącz connector.");
             connectionValue.setText("Gotowy do połączenia");
         } else {
             statusPill.setStateOff();
             stateHeadline.setText("Czeka na połączenie");
             stateHeadline.setForeground(TEXT_2);
-            stateSubline.setText("Wklej token GitHub Copilot, aby rozpocząć.");
             connectionValue.setText("Niepołączony");
         }
 
@@ -767,6 +757,13 @@ public class HeraldConnectorFrame extends JFrame {
         return component;
     }
 
+    private <T extends JComponent> T lockToFixedHeight(T component, int height) {
+        component.setMinimumSize(new Dimension(320, height));
+        component.setPreferredSize(new Dimension(320, height));
+        component.setMaximumSize(new Dimension(Integer.MAX_VALUE, height));
+        return component;
+    }
+
     private JButton lockButtonToTextWidth(JButton button, int horizontalPadding) {
         button.putClientProperty("JButton.minimumWidth", 0);
 
@@ -783,47 +780,6 @@ public class HeraldConnectorFrame extends JFrame {
         button.setPreferredSize(size);
         button.setMaximumSize(size);
         return button;
-    }
-
-    private JComponent cardScroller(JComponent content) {
-        ScrollableContentPanel wrapper = new ScrollableContentPanel();
-        wrapper.setOpaque(false);
-        wrapper.setLayout(new BorderLayout());
-        wrapper.add(content, BorderLayout.NORTH);
-
-        JScrollPane scroll = new JScrollPane(
-                wrapper,
-                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
-                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
-        );
-        scroll.setBorder(BorderFactory.createEmptyBorder());
-        scroll.setOpaque(false);
-        scroll.getViewport().setOpaque(false);
-        scroll.getVerticalScrollBar().setUnitIncrement(16);
-        return scroll;
-    }
-
-    private JComponent wrapSplitSection(JComponent content) {
-        JPanel wrapper = new JPanel(new BorderLayout());
-        wrapper.setOpaque(true);
-        wrapper.setBackground(BG);
-        wrapper.add(content, BorderLayout.CENTER);
-        wrapper.setMinimumSize(content.getMinimumSize());
-        wrapper.setPreferredSize(content.getPreferredSize());
-        return wrapper;
-    }
-
-    private JLabel createChip(String text) {
-        JLabel chip = new JLabel(text);
-        chip.setOpaque(true);
-        chip.setForeground(TEXT_2);
-        chip.setBackground(new Color(13, 71, 161, 18));
-        chip.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(new Color(13, 71, 161, 35), 1, true),
-                new EmptyBorder(6, 10, 6, 10)
-        ));
-        chip.setFont(chip.getFont().deriveFont(Font.BOLD, 12f));
-        return chip;
     }
 
     private JLabel htmlLabel(String text) {
