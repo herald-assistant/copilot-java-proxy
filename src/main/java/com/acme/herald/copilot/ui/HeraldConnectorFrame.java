@@ -10,12 +10,14 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.HyperlinkEvent;
 import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.geom.RoundRectangle2D;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
@@ -81,7 +83,6 @@ public class HeraldConnectorFrame extends JFrame {
         refreshFromState();
 
         append("Connector gotowy.");
-        append("Wklej Fine-Grained PAT z uprawnieniem 'Copilot requests', aby połączyć connector.");
     }
 
     private static void setupLookAndFeelOnce() {
@@ -466,13 +467,13 @@ public class HeraldConnectorFrame extends JFrame {
         title.setForeground(TEXT_2);
         title.setFont(title.getFont().deriveFont(Font.BOLD, 13f));
 
-        JLabel body = htmlLabel(
-                "1. Otwórz GitHub: Settings -> Developer settings -> Personal access tokens -> Fine-grained tokens.<br>" +
-                        "   Lub wejdź w link Link: https://github.com/settings/personal-access-tokens .<br>" +
+        JEditorPane body = clickableHtml(
+                "1. Otwórz GitHub: Settings -> Developer settings -> Personal access tokens -> Fine-grained tokens" +
+                        "<br>lub wejdź: <a href='https://github.com/settings/personal-access-tokens'>" +
+                        "https://github.com/settings/personal-access-tokens</a><br>" +
                         "2. Utwórz nowy token i dodaj uprawnienie <b>Copilot requests</b>.<br>" +
                         "3. Skopiuj token, wklej go tutaj i kliknij <b>Połącz connector</b>."
         );
-        body.setForeground(MUTED);
 
         banner.add(title, BorderLayout.NORTH);
         banner.add(body, BorderLayout.CENTER);
@@ -827,6 +828,55 @@ public class HeraldConnectorFrame extends JFrame {
 
     private JLabel htmlLabel(String text) {
         return new JLabel("<html>" + text + "</html>");
+    }
+
+    private JEditorPane clickableHtml(String text) {
+        JEditorPane pane = new JEditorPane();
+        pane.putClientProperty(JEditorPane.HONOR_DISPLAY_PROPERTIES, Boolean.TRUE);
+        pane.setContentType("text/html");
+        pane.setEditable(false);
+        pane.setFocusable(false);
+        pane.setOpaque(false);
+        pane.setBorder(BorderFactory.createEmptyBorder());
+        pane.setFont(new Font("Segoe UI", Font.PLAIN, 12));
+        pane.setText(
+                "<html><body style='margin:0; font-family:\"Segoe UI\"; font-size:12px; color:" + cssColor(MUTED) + ";'>" +
+                        text +
+                        "</body></html>"
+        );
+        pane.addHyperlinkListener(event -> {
+            if (event.getEventType() == HyperlinkEvent.EventType.ENTERED) {
+                pane.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            } else if (event.getEventType() == HyperlinkEvent.EventType.EXITED) {
+                pane.setCursor(Cursor.getDefaultCursor());
+            } else if (event.getEventType() == HyperlinkEvent.EventType.ACTIVATED && event.getURL() != null) {
+                openExternalLink(event.getURL().toString());
+            }
+        });
+        return pane;
+    }
+
+    private String cssColor(Color color) {
+        return String.format("#%02x%02x%02x", color.getRed(), color.getGreen(), color.getBlue());
+    }
+
+    private void openExternalLink(String url) {
+        try {
+            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(URI.create(url));
+                return;
+            }
+        } catch (Exception e) {
+            append("Nie udało się otworzyć linku: " + url);
+        }
+
+        Toolkit.getDefaultToolkit().beep();
+        JOptionPane.showMessageDialog(
+                this,
+                "Nie udało się otworzyć przeglądarki. Otwórz link ręcznie:\n" + url,
+                "Otwórz link",
+                JOptionPane.INFORMATION_MESSAGE
+        );
     }
 
     private void styleCheckBox(JCheckBox checkBox) {
