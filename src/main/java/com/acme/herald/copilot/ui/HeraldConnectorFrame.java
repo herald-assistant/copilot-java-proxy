@@ -187,27 +187,11 @@ public class HeraldConnectorFrame extends JFrame {
         subtitle.setFont(subtitle.getFont().deriveFont(Font.PLAIN, 14f));
         subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel description = htmlLabel(
-                "Wklej token, opcjonalnie zapisz go na tym komputerze i od razu zobacz, czy connector jest gotowy."
-        );
-        description.setForeground(TEXT);
-        description.setBorder(new EmptyBorder(10, 0, 0, 0));
-        description.setAlignmentX(Component.LEFT_ALIGNMENT);
-
-        JLabel supportLine = htmlLabel(
-                "Potrzebujesz <b>Fine-Grained PAT</b> z uprawnieniem <b>Copilot requests</b>."
-        );
-        supportLine.setForeground(MUTED);
-        supportLine.setBorder(new EmptyBorder(14, 0, 0, 0));
-        supportLine.setAlignmentX(Component.LEFT_ALIGNMENT);
-
         textBox.add(eyebrow);
         textBox.add(Box.createVerticalStrut(8));
         textBox.add(title);
         textBox.add(Box.createVerticalStrut(6));
         textBox.add(subtitle);
-        textBox.add(description);
-        textBox.add(supportLine);
 
         header.add(textBox, BorderLayout.CENTER);
         return header;
@@ -268,6 +252,7 @@ public class HeraldConnectorFrame extends JFrame {
         deleteSavedTokenBtn = new JButton("Usuń zapisany token");
         styleGhostButton(deleteSavedTokenBtn);
         deleteSavedTokenBtn.setForeground(DANGER);
+        lockButtonToTextWidth(deleteSavedTokenBtn, 20);
         deleteSavedTokenBtn.addActionListener(e -> deleteSavedToken());
 
         startBtn = new JButton("Połącz connector");
@@ -306,13 +291,33 @@ public class HeraldConnectorFrame extends JFrame {
         saveInfoColumn.add(Box.createVerticalStrut(6));
         saveInfoColumn.add(saveHint);
 
-        JPanel saveActionsRow = new JPanel(new BorderLayout(12, 0));
+        JPanel saveActionsRow = new JPanel(new GridBagLayout()) {
+            @Override
+            public Dimension getMaximumSize() {
+                Dimension preferred = getPreferredSize();
+                return new Dimension(Integer.MAX_VALUE, preferred.height);
+            }
+        };
         saveActionsRow.setOpaque(false);
         saveActionsRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-        saveActionsRow.setMaximumSize(new Dimension(Integer.MAX_VALUE,
-                Math.max(saveInfoColumn.getPreferredSize().height, deleteSavedTokenBtn.getPreferredSize().height)));
-        saveActionsRow.add(saveInfoColumn, BorderLayout.CENTER);
-        saveActionsRow.add(deleteSavedTokenBtn, BorderLayout.EAST);
+
+        GridBagConstraints saveInfoConstraints = new GridBagConstraints();
+        saveInfoConstraints.gridx = 0;
+        saveInfoConstraints.gridy = 0;
+        saveInfoConstraints.weightx = 1;
+        saveInfoConstraints.fill = GridBagConstraints.HORIZONTAL;
+        saveInfoConstraints.anchor = GridBagConstraints.NORTHWEST;
+        saveInfoConstraints.insets = new Insets(0, 0, 0, 12);
+
+        GridBagConstraints deleteButtonConstraints = new GridBagConstraints();
+        deleteButtonConstraints.gridx = 1;
+        deleteButtonConstraints.gridy = 0;
+        deleteButtonConstraints.weightx = 0;
+        deleteButtonConstraints.fill = GridBagConstraints.NONE;
+        deleteButtonConstraints.anchor = GridBagConstraints.NORTHEAST;
+
+        saveActionsRow.add(saveInfoColumn, saveInfoConstraints);
+        saveActionsRow.add(deleteSavedTokenBtn, deleteButtonConstraints);
 
         JPanel actionRow = new JPanel(new GridLayout(1, 2, 10, 0));
         actionRow.setOpaque(false);
@@ -463,6 +468,7 @@ public class HeraldConnectorFrame extends JFrame {
 
         JLabel body = htmlLabel(
                 "1. Otwórz GitHub: Settings -> Developer settings -> Personal access tokens -> Fine-grained tokens.<br>" +
+                        "   Lub wejdź w link Link: https://github.com/settings/personal-access-tokens .<br>" +
                         "2. Utwórz nowy token i dodaj uprawnienie <b>Copilot requests</b>.<br>" +
                         "3. Skopiuj token, wklej go tutaj i kliknij <b>Połącz connector</b>."
         );
@@ -760,9 +766,32 @@ public class HeraldConnectorFrame extends JFrame {
         return component;
     }
 
+    private JButton lockButtonToTextWidth(JButton button, int horizontalPadding) {
+        button.putClientProperty("JButton.minimumWidth", 0);
+
+        FontMetrics metrics = button.getFontMetrics(button.getFont());
+        Insets insets = button.getInsets();
+        int width = metrics.stringWidth(button.getText())
+                + insets.left
+                + insets.right
+                + horizontalPadding;
+        int height = button.getPreferredSize().height;
+
+        Dimension size = new Dimension(width, height);
+        button.setMinimumSize(size);
+        button.setPreferredSize(size);
+        button.setMaximumSize(size);
+        return button;
+    }
+
     private JComponent cardScroller(JComponent content) {
+        ScrollableContentPanel wrapper = new ScrollableContentPanel();
+        wrapper.setOpaque(false);
+        wrapper.setLayout(new BorderLayout());
+        wrapper.add(content, BorderLayout.NORTH);
+
         JScrollPane scroll = new JScrollPane(
-                content,
+                wrapper,
                 JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
                 JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
         );
@@ -843,6 +872,33 @@ public class HeraldConnectorFrame extends JFrame {
         ));
     }
 
+    static class ScrollableContentPanel extends JPanel implements Scrollable {
+        @Override
+        public Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+
+        @Override
+        public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return 16;
+        }
+
+        @Override
+        public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return Math.max(visibleRect.height - 32, 32);
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportHeight() {
+            return false;
+        }
+    }
+
     static class CardPanel extends JPanel {
         CardPanel() {
             setOpaque(false);
@@ -898,7 +954,7 @@ public class HeraldConnectorFrame extends JFrame {
         HeaderCard(Image mascot) {
             this.mascot = mascot;
             setOpaque(false);
-            setPreferredSize(new Dimension(900, 156));
+            setPreferredSize(new Dimension(900, 140));
         }
 
         @Override
