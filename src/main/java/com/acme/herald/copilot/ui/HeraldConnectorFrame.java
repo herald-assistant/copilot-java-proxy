@@ -22,21 +22,23 @@ import java.util.Optional;
 
 public class HeraldConnectorFrame extends JFrame {
 
-    private static final Color INK_BLUE = Color.decode("#0d47a1");
-    private static final Color INK_INDIGO = Color.decode("#3F37C9");
+    private static final Color INK_BLUE = Color.decode("#0071e3");
 
-    private static final Color BG = Color.decode("#f4f7fb");
+    private static final Color BG = Color.decode("#f5f5f7");
     private static final Color PANEL = Color.decode("#ffffff");
-    private static final Color PANEL_2 = Color.decode("#f8fafc");
-    private static final Color PANEL_3 = Color.decode("#eef3f9");
+    private static final Color PANEL_2 = Color.decode("#f9f9fb");
+    private static final Color PANEL_3 = Color.decode("#f2f2f7");
 
-    private static final Color TEXT = Color.decode("#334155");
-    private static final Color TEXT_2 = Color.decode("#0f172a");
-    private static final Color MUTED = Color.decode("#64748b");
+    private static final Color TEXT = Color.decode("#424245");
+    private static final Color TEXT_2 = Color.decode("#1d1d1f");
+    private static final Color MUTED = Color.decode("#6e6e73");
 
-    private static final Color BORDER = Color.decode("#d7deea");
-    private static final Color SUCCESS = Color.decode("#166534");
-    private static final Color DANGER = Color.decode("#b42318");
+    private static final Color BORDER = Color.decode("#e5e5ea");
+    private static final Color SUCCESS = Color.decode("#248a3d");
+    private static final Color DANGER = Color.decode("#c9342c");
+    private static final Color SHADOW = new Color(15, 23, 42, 10);
+    private static final Color TINT = new Color(0, 113, 227, 10);
+    private static final Color TINT_BORDER = new Color(0, 113, 227, 28);
 
     private static final DateTimeFormatter LOG_TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
 
@@ -60,10 +62,8 @@ public class HeraldConnectorFrame extends JFrame {
     private StatusPill statusPill;
     private JLabel stateHeadline;
     private JLabel stateSubline;
-    private JLabel endpointValue;
-    private JLabel portValue;
-    private JLabel storageValue;
-    private JLabel runtimeValue;
+    private JLabel connectionValue;
+    private JLabel tokenStateValue;
 
     private boolean closeHandled = false;
 
@@ -80,8 +80,7 @@ public class HeraldConnectorFrame extends JFrame {
         refreshFromState();
 
         append("Connector gotowy.");
-        append("Wklej token GitHub PAT z uprawnieniem 'Copilot requests' i uruchom connector.");
-        append("Endpoint lokalny: http://localhost:" + port);
+        append("Wklej Fine-Grained PAT z uprawnieniem 'Copilot requests', aby połączyć connector.");
     }
 
     private static void setupLookAndFeelOnce() {
@@ -92,10 +91,10 @@ public class HeraldConnectorFrame extends JFrame {
 
         FlatLightLaf.setup();
 
-        UIManager.put("Component.arc", 14);
-        UIManager.put("Button.arc", 14);
-        UIManager.put("TextComponent.arc", 14);
-        UIManager.put("Component.focusWidth", 1);
+        UIManager.put("Component.arc", 18);
+        UIManager.put("Button.arc", 20);
+        UIManager.put("TextComponent.arc", 16);
+        UIManager.put("Component.focusWidth", 0);
         UIManager.put("defaultFont", new Font("Segoe UI", Font.PLAIN, 13));
         UIManager.put("Panel.background", BG);
     }
@@ -123,8 +122,8 @@ public class HeraldConnectorFrame extends JFrame {
             }
         });
 
-        JPanel root = new JPanel(new BorderLayout(16, 16));
-        root.setBorder(new EmptyBorder(20, 20, 20, 20));
+        JPanel root = new JPanel(new BorderLayout(18, 18));
+        root.setBorder(new EmptyBorder(24, 24, 24, 24));
         root.setBackground(BG);
 
         root.add(buildHeaderCard(loadImage("/assets/herald-mascot.png")), BorderLayout.NORTH);
@@ -146,8 +145,8 @@ public class HeraldConnectorFrame extends JFrame {
 
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, topSection, bottomSection);
         split.setBorder(BorderFactory.createEmptyBorder());
-        split.setDividerSize(10);
-        split.setResizeWeight(0.64);
+        split.setDividerSize(12);
+        split.setResizeWeight(0.62);
         split.setContinuousLayout(true);
         split.setOneTouchExpandable(false);
         split.setOpaque(true);
@@ -158,97 +157,81 @@ public class HeraldConnectorFrame extends JFrame {
             split.repaint();
         });
 
-        SwingUtilities.invokeLater(() -> split.setDividerLocation(430));
+        SwingUtilities.invokeLater(() -> split.setDividerLocation(420));
         return split;
     }
 
     private JPanel buildHeaderCard(Image mascot) {
         HeaderCard header = new HeaderCard(mascot);
-        header.setLayout(new BorderLayout(16, 0));
-        header.setBorder(new EmptyBorder(16, 20, 16, 128));
+        header.setLayout(new BorderLayout(24, 0));
+        header.setBorder(new EmptyBorder(22, 24, 22, 116));
 
         JPanel textBox = new JPanel();
         textBox.setOpaque(false);
         textBox.setLayout(new BoxLayout(textBox, BoxLayout.Y_AXIS));
 
-        JLabel eyebrow = new JLabel("DESKTOP CONNECTOR");
+        JLabel eyebrow = new JLabel("HERALD CONNECTOR");
         eyebrow.setForeground(INK_BLUE);
         eyebrow.setFont(eyebrow.getFont().deriveFont(Font.BOLD, 11f));
         eyebrow.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JLabel title = new JLabel("Herald Copilot Connector");
         title.setForeground(TEXT_2);
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 27f));
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 29f));
         title.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel subtitle = new JLabel("Lokalny bridge Spring Boot do GitHub Copilot SDK");
+        JLabel subtitle = new JLabel("Proste połączenie Heralda z GitHub Copilot");
         subtitle.setForeground(MUTED);
-        subtitle.setFont(subtitle.getFont().deriveFont(Font.PLAIN, 13f));
+        subtitle.setFont(subtitle.getFont().deriveFont(Font.PLAIN, 14f));
         subtitle.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         JLabel description = htmlLabel(
-                "Przewidywalny lokalny connector dla Heralda. " +
-                        "UI upraszcza autoryzację, start runtime i podstawową diagnostykę."
+                "Wklej token, opcjonalnie zapisz go na tym komputerze i od razu zobacz, czy connector jest gotowy."
         );
         description.setForeground(TEXT);
-        description.setBorder(new EmptyBorder(8, 0, 0, 0));
+        description.setBorder(new EmptyBorder(10, 0, 0, 0));
         description.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JPanel chips = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        chips.setOpaque(false);
-        chips.setBorder(new EmptyBorder(12, 0, 0, 0));
-        chips.setAlignmentX(Component.LEFT_ALIGNMENT);
-        chips.add(createChip("Endpoint: http://localhost:" + port));
-        chips.add(createChip(DpapiCrypto.isWindows()
-                ? "Token lokalny: Windows DPAPI"
-                : "Token lokalny: tylko pamięć sesji"));
+        JLabel supportLine = htmlLabel(
+                "Potrzebujesz <b>Fine-Grained PAT</b> z uprawnieniem <b>Copilot requests</b>."
+        );
+        supportLine.setForeground(MUTED);
+        supportLine.setBorder(new EmptyBorder(14, 0, 0, 0));
+        supportLine.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         textBox.add(eyebrow);
-        textBox.add(Box.createVerticalStrut(6));
+        textBox.add(Box.createVerticalStrut(8));
         textBox.add(title);
         textBox.add(Box.createVerticalStrut(6));
         textBox.add(subtitle);
         textBox.add(description);
-        textBox.add(chips);
+        textBox.add(supportLine);
 
         header.add(textBox, BorderLayout.CENTER);
         return header;
     }
 
     private JPanel buildTopRow() {
-        JPanel row = new JPanel(new GridBagLayout());
+        JPanel row = new JPanel(new GridLayout(1, 2, 16, 0));
         row.setOpaque(false);
-
-        GridBagConstraints c = new GridBagConstraints();
-        c.gridy = 0;
-        c.fill = GridBagConstraints.BOTH;
-        c.weighty = 1;
-
-        c.gridx = 0;
-        c.weightx = 1.08;
-        c.insets = new Insets(0, 0, 0, 8);
-        row.add(buildControlsCard(), c);
-
-        c.gridx = 1;
-        c.weightx = 0.92;
-        c.insets = new Insets(0, 8, 0, 0);
-        row.add(buildOverviewCard(), c);
-
+        row.add(buildControlsCard());
+        row.add(buildOverviewCard());
         return row;
     }
 
     private JPanel buildControlsCard() {
         CardPanel card = new CardPanel();
-        card.setLayout(new BorderLayout(0, 14));
-        card.setBorder(new EmptyBorder(18, 18, 18, 18));
+        card.setLayout(new BorderLayout(0, 18));
+        card.setBorder(new EmptyBorder(22, 22, 22, 22));
 
         card.add(sectionHeader(
-                "Połączenie i autoryzacja",
-                "Wklej token PAT, zdecyduj czy zapamiętać go lokalnie i uruchom connector."
+                "Połącz z GitHub Copilot",
+                "Wklej token, zdecyduj czy ma zostać zapisany i włącz connector."
         ), BorderLayout.NORTH);
 
-        JPanel form = new JPanel(new GridBagLayout());
-        form.setOpaque(false);
+        JPanel content = new JPanel();
+        content.setOpaque(false);
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
 
         tokenField = new JPasswordField();
         tokenField.setEchoChar('•');
@@ -276,7 +259,7 @@ public class HeraldConnectorFrame extends JFrame {
         styleCheckBox(showToken);
         showToken.addActionListener(e -> tokenField.setEchoChar(showToken.isSelected() ? (char) 0 : '•'));
 
-        persistToken = new JCheckBox("Zapamiętaj token na tym komputerze");
+        persistToken = new JCheckBox("Zapisz token na tym komputerze");
         styleCheckBox(persistToken);
         persistToken.setToolTipText("Token zostanie zapisany lokalnie w profilu użytkownika.");
 
@@ -285,65 +268,69 @@ public class HeraldConnectorFrame extends JFrame {
         deleteSavedTokenBtn.setForeground(DANGER);
         deleteSavedTokenBtn.addActionListener(e -> deleteSavedToken());
 
-        startBtn = new JButton("Uruchom connector");
+        startBtn = new JButton("Połącz connector");
         stylePrimaryButton(startBtn);
         startBtn.addActionListener(e -> start());
 
-        stopBtn = new JButton("Zatrzymaj");
+        stopBtn = new JButton("Wyłącz connector");
         styleSecondaryButton(stopBtn);
         stopBtn.addActionListener(e -> stop());
 
-        GridBagConstraints c = new GridBagConstraints();
-        c.fill = GridBagConstraints.HORIZONTAL;
-        c.weightx = 1;
+        JLabel tokenLabel = fieldLabel("Token GitHub Copilot");
+        tokenLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        c.gridx = 0;
-        c.gridy = 0;
-        c.gridwidth = 4;
-        c.insets = new Insets(0, 0, 6, 0);
-        form.add(fieldLabel("GitHub token (PAT)"), c);
+        JPanel tokenRow = new JPanel(new BorderLayout(12, 0));
+        tokenRow.setOpaque(false);
+        tokenRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        tokenRow.setMaximumSize(new Dimension(Integer.MAX_VALUE,
+                Math.max(tokenField.getPreferredSize().height, showToken.getPreferredSize().height)));
+        tokenRow.add(tokenField, BorderLayout.CENTER);
+        tokenRow.add(showToken, BorderLayout.EAST);
 
-        c.gridy = 1;
-        c.gridwidth = 3;
-        c.insets = new Insets(0, 0, 8, 8);
-        form.add(tokenField, c);
+        JLabel permissionHint = metaLabel("Użyj Fine-Grained PAT z uprawnieniem Copilot requests.");
+        permissionHint.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        c.gridx = 3;
-        c.gridwidth = 1;
-        c.weightx = 0;
-        c.insets = new Insets(0, 0, 8, 0);
-        form.add(showToken, c);
+        JLabel saveHint = metaLabel(
+                DpapiCrypto.isWindows()
+                        ? "Po zaznaczeniu token zostanie zapisany tylko na tym komputerze."
+                        : "Na tym systemie token działa tylko w bieżącej sesji."
+        );
+        saveHint.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        c.gridx = 0;
-        c.gridy = 2;
-        c.gridwidth = 4;
-        c.weightx = 1;
-        c.insets = new Insets(0, 0, 12, 0);
-        form.add(metaLabel("Wymagane uprawnienie: Copilot requests. Bez zapisu lokalnego token pozostaje tylko w pamięci procesu."), c);
+        JPanel saveInfoColumn = new JPanel();
+        saveInfoColumn.setOpaque(false);
+        saveInfoColumn.setLayout(new BoxLayout(saveInfoColumn, BoxLayout.Y_AXIS));
+        saveInfoColumn.add(persistToken);
+        saveInfoColumn.add(Box.createVerticalStrut(6));
+        saveInfoColumn.add(saveHint);
 
-        c.gridy = 3;
-        c.gridwidth = 3;
-        c.insets = new Insets(0, 0, 12, 8);
-        form.add(persistToken, c);
+        JPanel saveActionsRow = new JPanel(new BorderLayout(12, 0));
+        saveActionsRow.setOpaque(false);
+        saveActionsRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        saveActionsRow.setMaximumSize(new Dimension(Integer.MAX_VALUE,
+                Math.max(saveInfoColumn.getPreferredSize().height, deleteSavedTokenBtn.getPreferredSize().height)));
+        saveActionsRow.add(saveInfoColumn, BorderLayout.CENTER);
+        saveActionsRow.add(deleteSavedTokenBtn, BorderLayout.EAST);
 
-        c.gridx = 3;
-        c.gridwidth = 1;
-        c.insets = new Insets(0, 0, 12, 0);
-        form.add(deleteSavedTokenBtn, c);
-
-        JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        JPanel actionRow = new JPanel(new GridLayout(1, 2, 10, 0));
         actionRow.setOpaque(false);
+        actionRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        actionRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, startBtn.getPreferredSize().height));
         actionRow.add(startBtn);
         actionRow.add(stopBtn);
 
-        c.gridx = 0;
-        c.gridy = 4;
-        c.gridwidth = 4;
-        c.insets = new Insets(0, 0, 0, 0);
-        form.add(actionRow, c);
+        content.add(tokenLabel);
+        content.add(Box.createVerticalStrut(8));
+        content.add(tokenRow);
+        content.add(Box.createVerticalStrut(8));
+        content.add(permissionHint);
+        content.add(Box.createVerticalStrut(18));
+        content.add(saveActionsRow);
+        content.add(Box.createVerticalStrut(22));
+        content.add(actionRow);
+        content.add(Box.createVerticalGlue());
 
-        card.add(form, BorderLayout.CENTER);
-        card.add(buildSecurityBanner(), BorderLayout.SOUTH);
+        card.add(content, BorderLayout.CENTER);
 
         updatePersistControls();
         return card;
@@ -351,24 +338,20 @@ public class HeraldConnectorFrame extends JFrame {
 
     private JPanel buildOverviewCard() {
         CardPanel card = new CardPanel();
-        card.setLayout(new BorderLayout(0, 14));
-        card.setBorder(new EmptyBorder(18, 18, 18, 18));
+        card.setLayout(new BorderLayout(0, 18));
+        card.setBorder(new EmptyBorder(22, 22, 22, 22));
 
         JPanel top = new JPanel(new BorderLayout(12, 0));
         top.setOpaque(false);
 
         top.add(sectionHeader(
-                "Stan connectora",
-                "Najważniejsze informacje runtime w jednym miejscu."
+                "Status połączenia",
+                "Od razu widać, czy connector jest gotowy i czy połączenie działa."
         ), BorderLayout.CENTER);
 
         statusPill = new StatusPill();
         statusPill.setStateOff();
         top.add(statusPill, BorderLayout.EAST);
-
-        JPanel body = new JPanel();
-        body.setOpaque(false);
-        body.setLayout(new BorderLayout());
 
         JPanel content = new JPanel();
         content.setOpaque(false);
@@ -376,52 +359,49 @@ public class HeraldConnectorFrame extends JFrame {
 
         stateHeadline = new JLabel("Connector wyłączony");
         stateHeadline.setForeground(TEXT_2);
-        stateHeadline.setFont(stateHeadline.getFont().deriveFont(Font.BOLD, 21f));
+        stateHeadline.setFont(stateHeadline.getFont().deriveFont(Font.BOLD, 24f));
         stateHeadline.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        stateSubline = new JLabel("Wklej token i kliknij Uruchom connector.");
+        stateSubline = new JLabel("Wklej token i kliknij Połącz connector.");
         stateSubline.setForeground(MUTED);
-        stateSubline.setFont(stateSubline.getFont().deriveFont(Font.PLAIN, 13f));
+        stateSubline.setFont(stateSubline.getFont().deriveFont(Font.PLAIN, 14f));
         stateSubline.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        endpointValue = valueLabel("");
-        portValue = valueLabel("");
-        storageValue = valueLabel("");
-        runtimeValue = valueLabel("");
+        connectionValue = statusValueLabel("");
+        tokenStateValue = statusValueLabel("");
 
-        JComponent sectionDivider = divider();
+        JPanel summaryRow = new JPanel(new GridLayout(1, 2, 12, 0));
+        summaryRow.setOpaque(false);
+        summaryRow.setAlignmentX(Component.LEFT_ALIGNMENT);
+        summaryRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 92));
+        summaryRow.add(statusTile("Połączenie", connectionValue));
+        summaryRow.add(statusTile("Token", tokenStateValue));
 
         content.add(lockToPreferredHeight(stateHeadline));
-        content.add(Box.createVerticalStrut(6));
+        content.add(Box.createVerticalStrut(8));
         content.add(lockToPreferredHeight(stateSubline));
-        content.add(Box.createVerticalStrut(14));
-        content.add(sectionDivider);
-        content.add(Box.createVerticalStrut(14));
-        content.add(infoRow("Endpoint", endpointValue));
-        content.add(Box.createVerticalStrut(10));
-        content.add(infoRow("Port", portValue));
-        content.add(Box.createVerticalStrut(10));
-        content.add(infoRow("Token lokalny", storageValue));
-        content.add(Box.createVerticalStrut(10));
-        content.add(infoRow("Runtime", runtimeValue));
-
-        body.add(content, BorderLayout.NORTH);
+        content.add(Box.createVerticalStrut(18));
+        content.add(lockToPreferredHeight(summaryRow));
+        content.add(Box.createVerticalStrut(18));
+        JComponent guideBanner = buildGuideBanner();
+        guideBanner.setAlignmentX(Component.LEFT_ALIGNMENT);
+        content.add(guideBanner);
+        content.add(Box.createVerticalGlue());
 
         card.add(top, BorderLayout.NORTH);
-        card.add(body, BorderLayout.CENTER);
-        card.add(buildGuideBanner(), BorderLayout.SOUTH);
+        card.add(content, BorderLayout.CENTER);
         return card;
     }
 
     private JPanel buildLogsCard() {
         CardPanel logsWrap = new CardPanel();
-        logsWrap.setLayout(new BorderLayout(0, 14));
-        logsWrap.setBorder(new EmptyBorder(18, 18, 18, 18));
+        logsWrap.setLayout(new BorderLayout(0, 18));
+        logsWrap.setBorder(new EmptyBorder(22, 22, 22, 22));
 
         JPanel top = new JPanel(new BorderLayout(12, 0));
         top.setOpaque(false);
         top.add(sectionHeader(
-                "Logi runtime",
+                "Logi",
                 "Lokalne zdarzenia connectora i podstawowa diagnostyka."
         ), BorderLayout.CENTER);
 
@@ -434,14 +414,14 @@ public class HeraldConnectorFrame extends JFrame {
         logs.setEditable(false);
         logs.setRows(12);
         logs.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        logs.setBackground(PANEL_3);
+        logs.setBackground(PANEL_2);
         logs.setForeground(TEXT_2);
         logs.setMargin(new Insets(12, 12, 12, 12));
         logs.setBorder(BorderFactory.createEmptyBorder());
 
         JScrollPane scroll = new JScrollPane(logs);
         scroll.setBorder(BorderFactory.createLineBorder(BORDER, 1, true));
-        scroll.getViewport().setBackground(PANEL_3);
+        scroll.getViewport().setBackground(PANEL_2);
         scroll.setPreferredSize(new Dimension(200, 260));
 
         logsWrap.add(top, BorderLayout.NORTH);
@@ -452,18 +432,18 @@ public class HeraldConnectorFrame extends JFrame {
     private JPanel buildSecurityBanner() {
         InfoBannerPanel banner = new InfoBannerPanel();
         banner.setLayout(new BorderLayout(0, 6));
-        banner.setBorder(new EmptyBorder(12, 14, 12, 14));
+        banner.setBorder(new EmptyBorder(14, 16, 14, 16));
 
-        JLabel title = new JLabel("Bezpieczeństwo tokena");
+        JLabel title = new JLabel("Przechowywanie tokena");
         title.setForeground(TEXT_2);
         title.setFont(title.getFont().deriveFont(Font.BOLD, 13f));
 
         String bodyText = DpapiCrypto.isWindows()
-                ? "Token może zostać zapisany lokalnie z użyciem Windows DPAPI. Bez tej opcji pozostaje wyłącznie w pamięci procesu."
+                ? "Token może zostać zapisany lokalnie. Bez zapisu pozostaje tylko w pamięci bieżącej sesji."
                 : "Na tym systemie token działa wyłącznie w pamięci bieżącej sesji.";
 
         JLabel body = htmlLabel(bodyText);
-        body.setForeground(TEXT);
+        body.setForeground(MUTED);
 
         banner.add(title, BorderLayout.NORTH);
         banner.add(body, BorderLayout.CENTER);
@@ -473,18 +453,18 @@ public class HeraldConnectorFrame extends JFrame {
     private JPanel buildGuideBanner() {
         InfoBannerPanel banner = new InfoBannerPanel();
         banner.setLayout(new BorderLayout(0, 6));
-        banner.setBorder(new EmptyBorder(12, 14, 12, 14));
+        banner.setBorder(new EmptyBorder(14, 16, 14, 16));
 
-        JLabel title = new JLabel("Szybki start");
+        JLabel title = new JLabel("Jak zdobyć token");
         title.setForeground(TEXT_2);
         title.setFont(title.getFont().deriveFont(Font.BOLD, 13f));
 
         JLabel body = htmlLabel(
-                "1. GitHub -> Settings -> Developer settings -> Personal access tokens.<br>" +
-                        "2. Wygeneruj nowy token i dodaj permission <b>Copilot requests</b>.<br>" +
-                        "3. Wklej token i kliknij <b>Uruchom connector</b>."
+                "1. Otwórz GitHub: Settings -> Developer settings -> Personal access tokens -> Fine-grained tokens.<br>" +
+                        "2. Utwórz nowy token i dodaj uprawnienie <b>Copilot requests</b>.<br>" +
+                        "3. Skopiuj token, wklej go tutaj i kliknij <b>Połącz connector</b>."
         );
-        body.setForeground(TEXT);
+        body.setForeground(MUTED);
 
         banner.add(title, BorderLayout.NORTH);
         banner.add(body, BorderLayout.CENTER);
@@ -540,15 +520,14 @@ public class HeraldConnectorFrame extends JFrame {
                 }
                 try {
                     tokenStore.savePlainToken(token);
-                    append("Token zapisany lokalnie.");
+                    append("Token został zapisany na tym komputerze.");
                 } catch (IOException ioe) {
                     throw new IllegalArgumentException("Nie udało się zapisać tokena lokalnie: " + ioe.getMessage());
                 }
             }
 
             state.enableWithToken(token);
-            append("Connector uruchomiony.");
-            append("Nasłuchiwanie lokalne: http://localhost:" + port);
+            append("Connector został połączony.");
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "Niepoprawny token", JOptionPane.WARNING_MESSAGE);
         }
@@ -558,7 +537,7 @@ public class HeraldConnectorFrame extends JFrame {
 
     private void stop() {
         state.disableAndClearToken();
-        append("Connector zatrzymany.");
+        append("Connector został wyłączony.");
         refreshFromState();
     }
 
@@ -625,34 +604,39 @@ public class HeraldConnectorFrame extends JFrame {
         updatePersistControls();
 
         if (on) {
-            statusPill.setStateOn("AKTYWNY");
-            stateHeadline.setText("Connector aktywny");
-            stateHeadline.setForeground(SUCCESS);
-            stateSubline.setText("Lokalny bridge działa i odpowiada pod wskazanym endpointem.");
+            statusPill.setStateOn("POŁĄCZONY");
+            stateHeadline.setText("Connector działa");
+            stateHeadline.setForeground(TEXT_2);
+            stateSubline.setText("Herald jest połączony z GitHub Copilot i gotowy do pracy.");
+            connectionValue.setText("Połączony");
+        } else if (hasToken) {
+            statusPill.setStateReady("GOTOWY");
+            stateHeadline.setText("Token jest gotowy");
+            stateHeadline.setForeground(TEXT_2);
+            stateSubline.setText("Możesz teraz kliknąć Połącz connector.");
+            connectionValue.setText("Gotowy do połączenia");
         } else {
             statusPill.setStateOff();
-            stateHeadline.setText("Connector wyłączony");
+            stateHeadline.setText("Czeka na połączenie");
             stateHeadline.setForeground(TEXT_2);
-            stateSubline.setText("Wklej token i kliknij Uruchom connector.");
+            stateSubline.setText("Wklej token GitHub Copilot, aby rozpocząć.");
+            connectionValue.setText("Niepołączony");
         }
 
-        endpointValue.setText("http://localhost:" + port);
-        portValue.setText(String.valueOf(port));
-        runtimeValue.setText(on ? "Sesja aktywna" : "Oczekuje na start");
-        storageValue.setText(describeStorageState());
+        tokenStateValue.setText(describeTokenState(hasToken));
     }
 
-    private String describeStorageState() {
+    private String describeTokenState(boolean hasToken) {
         if (!DpapiCrypto.isWindows()) {
-            return "Tylko pamięć sesji";
+            return hasToken ? "Tylko ta sesja" : "Jeszcze nie wklejony";
         }
         if (tokenStore.exists()) {
-            return "Zapisany lokalnie (DPAPI)";
+            return "Zapisany na tym komputerze";
         }
         if (persistToken != null && persistToken.isSelected()) {
-            return "Zapis przy następnym starcie";
+            return hasToken ? "Zapisze się po połączeniu" : "Będzie zapisany po wklejeniu";
         }
-        return "Tylko pamięć sesji";
+        return hasToken ? "Tylko w tej sesji" : "Jeszcze nie wklejony";
     }
 
     private void updatePersistControls() {
@@ -670,6 +654,7 @@ public class HeraldConnectorFrame extends JFrame {
 
         if (deleteSavedTokenBtn != null) {
             deleteSavedTokenBtn.setEnabled(!on && canPersist && hasSaved);
+            deleteSavedTokenBtn.setVisible(canPersist && hasSaved);
         }
     }
 
@@ -718,11 +703,12 @@ public class HeraldConnectorFrame extends JFrame {
 
         JLabel title = new JLabel(titleText);
         title.setForeground(TEXT_2);
-        title.setFont(title.getFont().deriveFont(Font.BOLD, 17f));
+        title.setFont(title.getFont().deriveFont(Font.BOLD, 16f));
 
         JLabel subtitle = htmlLabel(subtitleText);
         subtitle.setForeground(MUTED);
         subtitle.setBorder(new EmptyBorder(4, 0, 0, 0));
+        subtitle.setFont(subtitle.getFont().deriveFont(Font.PLAIN, 13f));
 
         panel.add(title);
         panel.add(subtitle);
@@ -732,7 +718,7 @@ public class HeraldConnectorFrame extends JFrame {
     private JLabel fieldLabel(String text) {
         JLabel label = new JLabel(text);
         label.setForeground(TEXT_2);
-        label.setFont(label.getFont().deriveFont(Font.BOLD, 13f));
+        label.setFont(label.getFont().deriveFont(Font.BOLD, 12.5f));
         return label;
     }
 
@@ -743,36 +729,27 @@ public class HeraldConnectorFrame extends JFrame {
         return label;
     }
 
-    private JLabel valueLabel(String text) {
+    private JLabel statusValueLabel(String text) {
         JLabel label = new JLabel(text);
         label.setForeground(TEXT_2);
-        label.setFont(label.getFont().deriveFont(Font.BOLD, 13f));
-        label.setHorizontalAlignment(SwingConstants.RIGHT);
+        label.setFont(label.getFont().deriveFont(Font.BOLD, 16f));
+        label.setVerticalAlignment(SwingConstants.TOP);
         return label;
     }
 
-    private JPanel infoRow(String labelText, JLabel value) {
-        JPanel row = new JPanel(new BorderLayout(12, 0));
-        row.setOpaque(false);
-        row.setAlignmentX(Component.LEFT_ALIGNMENT);
+    private JPanel statusTile(String titleText, JLabel value) {
+        InfoBannerPanel tile = new InfoBannerPanel();
+        tile.setLayout(new BorderLayout(0, 6));
+        tile.setBorder(new EmptyBorder(14, 16, 14, 16));
 
-        JLabel label = new JLabel(labelText);
-        label.setForeground(MUTED);
-        label.setFont(label.getFont().deriveFont(Font.PLAIN, 12f));
+        JLabel title = new JLabel(titleText);
+        title.setForeground(MUTED);
+        title.setFont(title.getFont().deriveFont(Font.PLAIN, 12f));
 
-        row.add(label, BorderLayout.WEST);
-        row.add(value, BorderLayout.CENTER);
-        return lockToPreferredHeight(row);
-    }
-
-    private JComponent divider() {
-        JPanel line = new JPanel();
-        line.setBackground(BORDER);
-        line.setAlignmentX(Component.LEFT_ALIGNMENT);
-        line.setMinimumSize(new Dimension(0, 1));
-        line.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
-        line.setPreferredSize(new Dimension(1, 1));
-        return lockToPreferredHeight(line);
+        value.setAlignmentX(Component.LEFT_ALIGNMENT);
+        tile.add(title, BorderLayout.NORTH);
+        tile.add(value, BorderLayout.CENTER);
+        return tile;
     }
 
     private <T extends JComponent> T lockToPreferredHeight(T component) {
@@ -812,6 +789,7 @@ public class HeraldConnectorFrame extends JFrame {
         checkBox.setOpaque(false);
         checkBox.setForeground(TEXT);
         checkBox.setFocusPainted(false);
+        checkBox.setBorder(new EmptyBorder(4, 0, 4, 0));
     }
 
     private void stylePrimaryButton(JButton button) {
@@ -819,15 +797,23 @@ public class HeraldConnectorFrame extends JFrame {
         button.setForeground(Color.WHITE);
         button.setFocusPainted(false);
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        button.setBorder(new EmptyBorder(10, 16, 10, 16));
+        button.putClientProperty("JButton.buttonType", "roundRect");
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(0, 91, 190), 1, true),
+                new EmptyBorder(11, 18, 11, 18)
+        ));
     }
 
     private void styleSecondaryButton(JButton button) {
-        button.setBackground(PANEL_2);
+        button.setBackground(PANEL);
         button.setForeground(TEXT_2);
         button.setFocusPainted(false);
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        button.setBorder(new EmptyBorder(10, 16, 10, 16));
+        button.putClientProperty("JButton.buttonType", "roundRect");
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(11, 18, 11, 18)
+        ));
     }
 
     private void styleGhostButton(JButton button) {
@@ -835,7 +821,11 @@ public class HeraldConnectorFrame extends JFrame {
         button.setForeground(TEXT);
         button.setFocusPainted(false);
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        button.setBorder(new EmptyBorder(9, 14, 9, 14));
+        button.putClientProperty("JButton.buttonType", "roundRect");
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(BORDER, 1, true),
+                new EmptyBorder(10, 16, 10, 16)
+        ));
     }
 
     static class CardPanel extends JPanel {
@@ -850,12 +840,14 @@ public class HeraldConnectorFrame extends JFrame {
 
             int w = getWidth();
             int h = getHeight();
+            RoundRectangle2D rr = new RoundRectangle2D.Double(0, 0, w - 1, h - 1, 26, 26);
 
+            g2.setColor(SHADOW);
+            g2.fillRoundRect(1, 4, w - 3, h - 5, 26, 26);
             g2.setColor(PANEL);
-            g2.fillRoundRect(0, 0, w - 1, h - 1, 22, 22);
-
+            g2.fill(rr);
             g2.setColor(BORDER);
-            g2.drawRoundRect(0, 0, w - 1, h - 1, 22, 22);
+            g2.draw(rr);
 
             g2.dispose();
             super.paintComponent(g);
@@ -874,19 +866,10 @@ public class HeraldConnectorFrame extends JFrame {
 
             int w = getWidth();
             int h = getHeight();
-
             RoundRectangle2D rr = new RoundRectangle2D.Double(0, 0, w - 1, h - 1, 18, 18);
-            g2.setColor(PANEL_2);
+            g2.setColor(TINT);
             g2.fill(rr);
-
-            Shape oldClip = g2.getClip();
-            g2.setClip(rr);
-            GradientPaint gp = new GradientPaint(0, 0, INK_BLUE, 0, h, INK_INDIGO);
-            g2.setPaint(gp);
-            g2.fillRect(0, 0, 5, h);
-            g2.setClip(oldClip);
-
-            g2.setColor(BORDER);
+            g2.setColor(TINT_BORDER);
             g2.draw(rr);
 
             g2.dispose();
@@ -900,7 +883,7 @@ public class HeraldConnectorFrame extends JFrame {
         HeaderCard(Image mascot) {
             this.mascot = mascot;
             setOpaque(false);
-            setPreferredSize(new Dimension(900, 142));
+            setPreferredSize(new Dimension(900, 156));
         }
 
         @Override
@@ -912,23 +895,16 @@ public class HeraldConnectorFrame extends JFrame {
             int h = getHeight();
             RoundRectangle2D rr = new RoundRectangle2D.Double(0, 0, w - 1, h - 1, 24, 24);
 
+            g2.setColor(SHADOW);
+            g2.fillRoundRect(1, 4, w - 3, h - 5, 24, 24);
             g2.setColor(PANEL);
             g2.fill(rr);
-
-            Shape oldClip = g2.getClip();
-            g2.setClip(rr);
-
-            GradientPaint rail = new GradientPaint(0, 0, INK_BLUE, 0, h, INK_INDIGO);
-            g2.setPaint(rail);
-            g2.fillRect(0, 0, 10, h);
-
-            g2.setClip(oldClip);
             g2.setColor(BORDER);
             g2.draw(rr);
 
             if (mascot != null) {
-                int size = 78;
-                int x = w - size - 22;
+                int size = 72;
+                int x = w - size - 28;
                 int y = (h - size) / 2;
 
                 Image scaled = mascot.getScaledInstance(size, size, Image.SCALE_SMOOTH);
@@ -941,29 +917,37 @@ public class HeraldConnectorFrame extends JFrame {
     }
 
     static class StatusPill extends JLabel {
-        private Color bg = new Color(100, 116, 139, 30);
-        private Color border = new Color(148, 163, 184, 55);
+        private Color bg = new Color(110, 110, 115, 18);
+        private Color border = new Color(110, 110, 115, 30);
 
         StatusPill() {
             setOpaque(false);
-            setBorder(new EmptyBorder(8, 12, 8, 12));
-            setFont(getFont().deriveFont(Font.BOLD, 12f));
+            setBorder(new EmptyBorder(8, 14, 8, 14));
+            setFont(getFont().deriveFont(Font.BOLD, 11.5f));
             setStateOff();
         }
 
         void setStateOff() {
-            setText("WYŁĄCZONY");
+            setText("OCZEKUJE");
             setForeground(MUTED);
-            bg = new Color(100, 116, 139, 28);
-            border = new Color(148, 163, 184, 50);
+            bg = new Color(110, 110, 115, 18);
+            border = new Color(110, 110, 115, 32);
+            repaint();
+        }
+
+        void setStateReady(String text) {
+            setText(text);
+            setForeground(INK_BLUE);
+            bg = new Color(0, 113, 227, 18);
+            border = new Color(0, 113, 227, 32);
             repaint();
         }
 
         void setStateOn(String text) {
             setText(text);
             setForeground(SUCCESS);
-            bg = new Color(34, 197, 94, 34);
-            border = new Color(34, 197, 94, 60);
+            bg = new Color(36, 138, 61, 18);
+            border = new Color(36, 138, 61, 32);
             repaint();
         }
 
