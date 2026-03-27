@@ -178,6 +178,16 @@ Jeżeli connector jest wyłączony, API zwraca `503 Service Unavailable`, nawet 
 | `POST` | `/chat/explain/completions` | Rozmowa utrzymywana po `conversationId` | Stateful |
 | `DELETE` | `/chat/explain/sessions/{conversationId}` | Jawne zamknięcie sesji explain | Stateful |
 
+### OpenAPI
+
+Po uruchomieniu aplikacji dokumentacja i specyfikacja OpenAPI są dostępne pod:
+
+- `GET /v3/api-docs` - JSON do generowania klientów frontendowych,
+- `GET /v3/api-docs.yaml` - ten sam kontrakt w YAML,
+- `GET /swagger-ui/index.html` - interaktywny podgląd endpointów.
+
+Spec zawiera opisy endpointów oraz własne DTO request/response, w tym model odpowiedzi dla `/models`, żeby generator klienta nie opierał się na klasach z zewnętrznego Copilot SDK.
+
 ### `GET /healthz`
 
 Sprawdza, czy connector jest aktywny z perspektywy aplikacji klienckiej.
@@ -335,6 +345,16 @@ To jest właściwy endpoint dla scenariusza "kontynuuj rozmowę o tym samym prob
 {
   "conversationId": "ticket-1234-thread-a",
   "model": "gpt-5",
+  "files": [
+    "C:\\work\\repo\\src\\main\\java\\com\\acme\\herald\\copilot\\api\\ExplainChatController.java",
+    "C:\\work\\repo\\src\\main\\java\\com\\acme\\herald\\copilot\\usecase\\explain\\ExplainConversationService.java"
+  ],
+  "inlineFiles": [
+    {
+      "name": "docs/confluence-summary.md",
+      "content": "# Notatka\\n\\nTreść wygenerowana z Confluence."
+    }
+  ],
   "messages": [
     {
       "role": "system",
@@ -355,22 +375,35 @@ To jest właściwy endpoint dla scenariusza "kontynuuj rozmowę o tym samym prob
 | --- | --- | --- | --- |
 | `conversationId` | `string` | Tak | Stabilny identyfikator rozmowy. |
 | `model` | `string` | Nie | Model powiązany z sesją explain. |
+| `files` | `array[string]` | Nie | Lista plików do przypięcia do sesji explain. Backend normalizuje ścieżki do absolutnych i dołącza te pliki jako kontekst do kolejnych promptów. |
+| `inlineFiles` | `array[object]` | Nie | Lista plików przesyłanych inline jako `name` + `content`. Backend zapisuje je obok uruchomionej aplikacji w katalogu sesji i dołącza do Copilota jak zwykłe pliki. |
 | `messages` | `array` | Tak | Wiadomości wejściowe. |
 | `reset` | `boolean` | Nie | Gdy `true`, stara sesja dla `conversationId` jest zamykana i tworzona od nowa. |
+
+#### `inlineFiles[*]`
+
+| Pole | Typ | Wymagane | Opis |
+| --- | --- | --- | --- |
+| `name` | `string` | Tak | Relatywna nazwa pliku w katalogu sesji, np. `docs/spec.md`. Nie może wychodzić poza katalog sesji. |
+| `content` | `string` | Tak | Treść pliku zapisywana w UTF-8. Może być pusta. |
 
 #### Zachowanie sesji
 
 - Pierwsze wywołanie dla danego `conversationId` tworzy nową sesję Copilot.
 - Jeżeli `reset=true`, poprzednia sesja jest zamykana przed obsługą żądania.
+- Jeżeli przy tworzeniu sesji przekażesz `files` lub `inlineFiles`, backend zapamięta ten zestaw i będzie dołączał te pliki do kolejnych promptów w ramach tej samej sesji.
+- `inlineFiles` są zapisywane obok uruchomionej aplikacji w katalogu `herald-explain-sessions/<session-id>/` i są usuwane po zamknięciu, wymianie albo wygaśnięciu sesji.
+- Przy kolejnych wywołaniach możesz pominąć `files` i `inlineFiles`, a backend użyje zestawu zapisanego już w sesji.
+- Jeżeli dla tego samego `conversationId` wyślesz inny, niepusty zestaw `files` i/lub `inlineFiles`, backend odtworzy sesję od nowa i przypnie nowy komplet plików.
 - Dla nowej sesji backend wysyła do Copilota pełną spłaszczoną konwersację.
 - Dla istniejącej sesji backend bierze przede wszystkim ostatnią wiadomość `user` i traktuje ją jako kolejny prompt.
 - Jeżeli nie znajdzie ostatniej wiadomości `user`, użyje fallbacku w postaci pełnej spłaszczonej konwersacji.
 - Sesje wygasają po 30 minutach bezczynności.
-- Zmiana tokena albo modelu dla tego samego `conversationId` powoduje wymianę sesji na nową.
+- Zmiana tokena, modelu albo niepustego zestawu `files` / `inlineFiles` dla tego samego `conversationId` powoduje wymianę sesji na nową.
 
 #### Bardzo ważna uwaga integracyjna
 
-Jeżeli klient zmienia system prompt, wcześniejszy kontekst albo chce logicznie rozpocząć rozmowę od nowa, powinien:
+Jeżeli klient zmienia system prompt, wcześniejszy kontekst, chce wyczyścić przypiętą listę plików, zastąpić `inlineFiles` pustym zestawem albo logicznie rozpocząć rozmowę od nowa, powinien:
 
 - ustawić `reset=true`, albo
 - wykonać `DELETE /chat/explain/sessions/{conversationId}` i dopiero potem zacząć nową rozmowę.
@@ -386,6 +419,16 @@ curl -X POST http://localhost:8788/chat/explain/completions \
   -d '{
     "conversationId": "analysis-42",
     "model": "gpt-5",
+    "files": [
+      "C:\\work\\repo\\src\\main\\java\\com\\acme\\herald\\copilot\\api\\ExplainChatController.java",
+      "C:\\work\\repo\\src\\main\\java\\com\\acme\\herald\\copilot\\usecase\\explain\\ExplainConversationService.java"
+    ],
+    "inlineFiles": [
+      {
+        "name": "notes/confluence-context.md",
+        "content": "# Confluence\\n\\nTo jest treść dostarczona inline."
+      }
+    ],
     "messages": [
       { "role": "system", "content": "Tłumacz kod krok po kroku." },
       { "role": "user", "content": "Wyjaśnij mi, jak działa ten kontroler." }
@@ -433,7 +476,8 @@ Najważniejsze różnice względem klasycznego `POST /v1/chat/completions`:
 - endpoint `/models` nie zwraca wrappera `data`,
 - `temperature`, `max_tokens` i `stream` są obecnie ignorowane,
 - odpowiedź zawsze zawiera jedną wiadomość asystenta,
-- brak wsparcia dla tool calls, function calling, attachments i streamingu SSE.
+- brak wsparcia dla tool calls, function calling i streamingu SSE,
+- endpoint explain obsługuje własne pola `files` i `inlineFiles`, ale nie jest to standardowy mechanizm attachments z OpenAI API.
 
 ### Tryb chat-only
 
@@ -441,7 +485,7 @@ Sesje Copilot są uruchamiane z dodatkowymi ograniczeniami:
 
 - brak dostępu do narzędzi,
 - brak dostępu do terminala,
-- brak dostępu do plików i edycji plików,
+- brak dowolnego dostępu do plików i edycji plików; wyjątkiem są pliki jawnie przekazane w `files` lub `inlineFiles`, dołączane tylko jako kontekst do explain,
 - brak dostępu do weba,
 - brak dostępu do MCP.
 

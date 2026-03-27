@@ -32,6 +32,8 @@ public class ExplainConversationService {
 
     public OpenAIChatResponse execute(HttpServletRequest httpRequest, ExplainChatRequest request) {
         String token = tokenResolver.resolveOrThrow(httpRequest);
+        ExplainSessionAttachments.RequestedAttachments requestedAttachments =
+                ExplainSessionAttachments.fromRequest(request.files, request.inlineFiles);
 
         boolean resetRequested = Boolean.TRUE.equals(request.reset);
         if (resetRequested) {
@@ -41,7 +43,8 @@ public class ExplainConversationService {
         ExplainSessionHandle handle = explainSessionRegistry.getOrCreate(
                 request.conversationId,
                 token,
-                request.model
+                request.model,
+                requestedAttachments
         );
 
         ExplainSessionEntry entry = handle.entry();
@@ -56,6 +59,9 @@ public class ExplainConversationService {
 
                 var messageOptions = new MessageOptions();
                 messageOptions.setPrompt(prompt);
+                if (!entry.getAttachments().isEmpty()) {
+                    messageOptions.setAttachments(entry.getAttachments());
+                }
 
                 CompletableFuture<AssistantMessageEvent> future =
                         entry.getSession().sendAndWait(messageOptions, WAIT_TIMEOUT_MS);

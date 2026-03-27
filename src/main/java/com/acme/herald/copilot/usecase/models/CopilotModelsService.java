@@ -1,5 +1,6 @@
 package com.acme.herald.copilot.usecase.models;
 
+import com.acme.herald.copilot.api.dto.ChatModelResponse;
 import com.acme.herald.copilot.core.auth.CopilotTokenResolver;
 import com.acme.herald.copilot.core.client.CopilotClientFactory;
 import com.acme.herald.copilot.core.error.CopilotExceptionMapper;
@@ -27,12 +28,15 @@ public class CopilotModelsService {
         this.clientFactory = clientFactory;
     }
 
-    public List<ModelInfo> getModels(HttpServletRequest httpRequest) {
+    public List<ChatModelResponse> getModels(HttpServletRequest httpRequest) {
         String token = tokenResolver.resolveOrThrow(httpRequest);
 
         try (var client = clientFactory.create(token)) {
             client.start().get(CLIENT_START_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-            return client.listModels().get(LIST_MODELS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            List<ModelInfo> models = client.listModels().get(LIST_MODELS_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            return models.stream()
+                    .map(ChatModelResponse::from)
+                    .toList();
         } catch (Exception e) {
             throw CopilotExceptionMapper.mapExecutionFailure(CopilotModelsService.class, e);
         }

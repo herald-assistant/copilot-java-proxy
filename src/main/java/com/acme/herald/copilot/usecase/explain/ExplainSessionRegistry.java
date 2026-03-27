@@ -7,6 +7,7 @@ import com.github.copilot.sdk.CopilotClient;
 import com.github.copilot.sdk.CopilotSession;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -29,11 +30,16 @@ public class ExplainSessionRegistry {
         this.sessionConfigFactory = sessionConfigFactory;
     }
 
-    public ExplainSessionHandle getOrCreate(String conversationId, String token, String requestedModel) {
+    public ExplainSessionHandle getOrCreate(
+            String conversationId,
+            String token,
+            String requestedModel,
+            ExplainSessionAttachments.RequestedAttachments requestedAttachments
+    ) {
         evictExpiredSessions();
 
         ExplainSessionEntry existing = sessions.get(conversationId);
-        if (existing != null && existing.matches(token, requestedModel) && !existing.isExpired(now())) {
+        if (existing != null && existing.matches(token, requestedModel, requestedAttachments) && !existing.isExpired(now())) {
             existing.touch();
             return new ExplainSessionHandle(existing, false);
         }
@@ -42,7 +48,7 @@ public class ExplainSessionRegistry {
             evictExpiredSessions();
 
             ExplainSessionEntry current = sessions.get(conversationId);
-            if (current != null && current.matches(token, requestedModel) && !current.isExpired(now())) {
+            if (current != null && current.matches(token, requestedModel, requestedAttachments) && !current.isExpired(now())) {
                 current.touch();
                 return new ExplainSessionHandle(current, false);
             }
@@ -52,7 +58,7 @@ public class ExplainSessionRegistry {
                 current.closeQuietly();
             }
 
-            ExplainSessionEntry created = createEntry(conversationId, token, requestedModel);
+            ExplainSessionEntry created = createEntry(conversationId, token, requestedModel, requestedAttachments);
             sessions.put(conversationId, created);
             return new ExplainSessionHandle(created, true);
         }
@@ -75,8 +81,16 @@ public class ExplainSessionRegistry {
         }
     }
 
-    private ExplainSessionEntry createEntry(String conversationId, String token, String requestedModel) {
+    private ExplainSessionEntry createEntry(
+            String conversationId,
+            String token,
+            String requestedModel,
+            ExplainSessionAttachments.RequestedAttachments requestedAttachments
+    ) {
         String normalizedModel = normalizeModel(requestedModel);
+        ExplainSessionAttachments.MaterializedAttachments materializedAttachments = requestedAttachments == null
+                ? new ExplainSessionAttachments.MaterializedAttachments(List.of(), null, null)
+                : requestedAttachments.materializeForSession(conversationId);
 
         CopilotClient client = null;
         try {
@@ -91,6 +105,9 @@ public class ExplainSessionRegistry {
                     conversationId,
                     ExplainSessionUtils.fingerprint(token),
                     normalizedModel,
+                    materializedAttachments.fingerprint(),
+                    materializedAttachments.attachments(),
+                    materializedAttachments.sessionDirectory(),
                     client,
                     session,
                     now(),
@@ -104,6 +121,7 @@ public class ExplainSessionRegistry {
                     // ignore close failure
                 }
             }
+            ExplainSessionAttachments.deleteDirectoryQuietly(materializedAttachments.sessionDirectory());
             throw CopilotExceptionMapper.mapExecutionFailure(ExplainSessionRegistry.class, e);
         }
     }

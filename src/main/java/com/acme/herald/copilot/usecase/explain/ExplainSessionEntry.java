@@ -2,7 +2,10 @@ package com.acme.herald.copilot.usecase.explain;
 
 import com.github.copilot.sdk.CopilotClient;
 import com.github.copilot.sdk.CopilotSession;
+import com.github.copilot.sdk.json.Attachment;
 
+import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 
 final class ExplainSessionEntry {
@@ -10,6 +13,9 @@ final class ExplainSessionEntry {
     private final String conversationId;
     private final String tokenFingerprint;
     private final String model;
+    private final String attachmentsFingerprint;
+    private final List<Attachment> attachments;
+    private final Path sessionDirectory;
     private final CopilotClient client;
     private final CopilotSession session;
     private final long ttlMs;
@@ -21,6 +27,9 @@ final class ExplainSessionEntry {
             String conversationId,
             String tokenFingerprint,
             String model,
+            String attachmentsFingerprint,
+            List<Attachment> attachments,
+            Path sessionDirectory,
             CopilotClient client,
             CopilotSession session,
             long createdAtMs,
@@ -29,6 +38,9 @@ final class ExplainSessionEntry {
         this.conversationId = conversationId;
         this.tokenFingerprint = tokenFingerprint;
         this.model = model;
+        this.attachmentsFingerprint = attachmentsFingerprint;
+        this.attachments = attachments == null ? List.of() : List.copyOf(attachments);
+        this.sessionDirectory = sessionDirectory;
         this.client = client;
         this.session = session;
         this.lastUsedAtMs = createdAtMs;
@@ -41,6 +53,10 @@ final class ExplainSessionEntry {
 
     String getModel() {
         return model;
+    }
+
+    List<Attachment> getAttachments() {
+        return attachments;
     }
 
     CopilotSession getSession() {
@@ -59,17 +75,26 @@ final class ExplainSessionEntry {
         return nowMs - lastUsedAtMs > ttlMs;
     }
 
-    boolean matches(String rawToken, String requestedModel) {
+    boolean matches(
+            String rawToken,
+            String requestedModel,
+            ExplainSessionAttachments.RequestedAttachments requestedAttachments
+    ) {
         String incomingFingerprint = ExplainSessionUtils.fingerprint(rawToken);
         if (!Objects.equals(tokenFingerprint, incomingFingerprint)) {
             return false;
         }
 
-        if (requestedModel == null || requestedModel.isBlank()) {
+        if (requestedModel != null && !requestedModel.isBlank()
+                && !Objects.equals(model, requestedModel.trim())) {
+            return false;
+        }
+
+        if (requestedAttachments == null) {
             return true;
         }
 
-        return Objects.equals(model, requestedModel.trim());
+        return requestedAttachments.matchesStoredFingerprint(attachmentsFingerprint);
     }
 
     void closeQuietly() {
@@ -84,5 +109,7 @@ final class ExplainSessionEntry {
         } catch (Exception ignored) {
             // ignore
         }
+
+        ExplainSessionAttachments.deleteDirectoryQuietly(sessionDirectory);
     }
 }
